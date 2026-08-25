@@ -87,28 +87,34 @@ Los datos actuales están en `bank`, dentro de `js/data.js`: Vanessa Sanchez, Cu
 
 Ambas funciones fueron retiradas de esta versión por decisión de la familia. Cuando Luciano nazca, se puede crear una nueva portada o preportada y volver a incorporar un álbum sin alterar esta invitación final. Para una carga rápida, conviene usar fotografías JPG o WebP de menos de 1 MB.
 
-## Conectar Google Forms
+## Formularios y datos compartidos
 
-La maqueta funciona localmente para pruebas incluso sin conexión externa. Para recibir confirmaciones reales:
+La versión final ya está conectada a los tres Google Forms de la familia:
 
-1. Crea un Google Form de asistencia con los campos: Nombre, Asistiré, Adultos, Niños, Niñas y Observaciones.
-2. Crea otro Google Form con: Nombre y Deseo para Luciano.
-3. Vincula cada formulario a su Google Sheet desde la pestaña **Respuestas**.
-4. Copia las direcciones de envío y los identificadores `entry.xxxxx` de cada campo.
-5. Pégalos en `SITE.forms` dentro de `js/data.js`.
+- Confirmación de asistencia.
+- Estrellas para El Cielo de Lucianito.
+- Reservas compartidas de regalos.
 
-La configuración se deja vacía a propósito: solo la familia puede crear los formularios y decidir dónde se almacenan datos personales. Mientras esté vacía, las pruebas se guardan únicamente en el navegador de cada visitante.
+Las direcciones y los identificadores están en `SITE.forms`, al comienzo de `js/data.js`. No los cambies mientras uses los formularios actuales. Las confirmaciones de asistencia se guardan únicamente en su hoja privada; la página no publica ni lee esos datos personales.
+
+Cuando alguien reserva un regalo, la página envía el código, el nombre del producto y el nombre de la persona al formulario de reservas. Todos los visitantes leen la misma hoja pública, por lo que una tarjeta reservada cambia para todos. Si quieres liberar un regalo, elimina su fila en la hoja de respuestas de reservas. El cambio puede tardar unos segundos y se verá al recargar la invitación.
 
 ## Conectar El Cielo de Lucianito a Google Sheets
 
-Para que las estrellas se compartan entre todos:
+El cielo ya lee la hoja pública configurada en `SITE.sheets.wishes`, dentro de `js/data.js`. Cada respuesta válida necesita las columnas **Marca temporal**, **Nombre** y **Deseo para Luciano**. Las columnas antiguas vacías no afectan el funcionamiento.
 
-1. Usa el formulario de deseos conectado a una hoja de cálculo.
-2. Publica la pestaña de respuestas como CSV desde **Archivo → Compartir → Publicar en la web**.
-3. Copia el enlace CSV en `sheetCsv` dentro de `SITE.forms` en `js/data.js`.
-4. Conserva columnas para nombre, mensaje y fecha.
+Al eliminar una fila de esa hoja, su estrella dejará de aparecer al actualizar la invitación. Para cambiar de hojas en el futuro, publica la nueva pestaña como CSV desde **Archivo → Compartir → Publicar en la web** y reemplaza solamente la dirección correspondiente en `SITE.sheets`. No se necesita Firebase ni una base de datos pagada.
 
-Al eliminar una fila de esa hoja, el mensaje dejará de aparecer la próxima vez que se recargue la página. No se necesita Firebase ni base de datos propia.
+## Comprobar que todo está conectado
+
+1. Publica los archivos actualizados en GitHub Pages.
+2. Abre la invitación desde un teléfono.
+3. Envía una confirmación con un nombre fácil de reconocer y comprueba su llegada en la hoja privada de asistencia.
+4. Deja una estrella de prueba. Debe aparecer inmediatamente y permanecer después de recargar la página.
+5. Reserva un regalo económico de prueba. Abre la invitación en otro dispositivo o en una ventana privada: la tarjeta debe mostrar el mismo nombre.
+6. Borra las dos filas de prueba en las hojas de estrellas y reservas. Recarga la invitación y ambas deben desaparecer.
+
+Google puede tardar algunos segundos en actualizar las hojas publicadas. La página vuelve a consultar los datos automáticamente cada minuto y también al regresar a la pestaña.
 
 ## Accesibilidad y rendimiento
 

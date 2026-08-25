@@ -3,28 +3,108 @@
 
   const $ = (selector, scope = document) => scope.querySelector(selector);
   const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
-  const storage = {
-    get(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
-    set(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
-  };
   const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
   const categories = { all:'Todos', essential:'Esenciales', care:'Cuidados', clothing:'Textiles', feeding:'Alimentación', contribution:'Aportes' };
   let activeFilter = 'all';
   let exitPromptShown = false;
+  let remoteWishes = [];
+  let remoteReservations = {};
+  let pendingWishes = [];
+  let pendingReservations = {};
+  let reservationsReady = false;
+  let wishSentThisVisit = false;
 
-  /* Limpieza única de los datos usados durante las pruebas de la invitación. */
-  function cleanTestDataOnce() {
-    const migrationKey = 'luciano-final-cleanup-v1';
-    if (storage.get(migrationKey, false)) return;
+  function normalizeHeader(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  }
 
-    const reserved = storage.get('luciano-reserved', {});
-    delete reserved['1'];
-    storage.set('luciano-reserved', reserved);
+  function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      if (char === '"') {
+        if (quoted && text[index + 1] === '"') { cell += '"'; index += 1; }
+        else quoted = !quoted;
+      } else if (char === ',' && !quoted) {
+        row.push(cell); cell = '';
+      } else if ((char === '\n' || char === '\r') && !quoted) {
+        if (char === '\r' && text[index + 1] === '\n') index += 1;
+        row.push(cell); cell = '';
+        if (row.some(value => value.trim())) rows.push(row);
+        row = [];
+      } else cell += char;
+    }
+    if (cell || row.length) { row.push(cell); if (row.some(value => value.trim())) rows.push(row); }
+    if (!rows.length) return [];
+    const headers = rows.shift().map(normalizeHeader);
+    return rows.map(values => Object.fromEntries(headers.map((header, index) => [header, (values[index] || '').trim()])));
+  }
 
-    const wishes = storage.get('luciano-wishes', []);
-    const davidWishes = wishes.filter(wish => String(wish.name || '').trim().toLocaleLowerCase('es-CL').startsWith('david'));
-    storage.set('luciano-wishes', davidWishes);
-    storage.set(migrationKey, true);
+  async function postGoogleForm(config, values) {
+    if (!config?.url) throw new Error('Formulario sin configurar');
+    const body = new URLSearchParams();
+    Object.entries(values).forEach(([key, value]) => {
+      const entry = config.entries[key];
+      if (entry && value !== undefined && value !== null) body.append(entry, String(value));
+    });
+    await fetch(config.url, { method:'POST', mode:'no-cors', body });
+  }
+
+  async function fetchCsv(url) {
+    const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache:'no-store' });
+    if (!response.ok) throw new Error(`No se pudo leer la hoja (${response.status})`);
+    return parseCsv(await response.text());
+  }
+
+  function wishKey(wish) {
+    return `${normalizeHeader(wish.name)}|${normalizeHeader(wish.message)}`;
+  }
+
+  async function loadSharedWishes() {
+    try {
+      const rows = await fetchCsv(SITE.sheets.wishes);
+      remoteWishes = rows.map(row => ({
+        name:row.nombre,
+        message:row['deseo para luciano'],
+        date:row['marca temporal']
+      })).filter(wish => wish.name && wish.message);
+      const remoteKeys = new Set(remoteWishes.map(wishKey));
+      pendingWishes = pendingWishes.filter(wish => !remoteKeys.has(wishKey(wish)));
+      renderWishes();
+    } catch (error) {
+      console.warn('No fue posible actualizar el cielo compartido.', error);
+      if (!allWishes().length) $('#starCount').textContent = 'Cielo temporalmente no disponible';
+    }
+  }
+
+  async function loadSharedReservations() {
+    try {
+      const rows = await fetchCsv(SITE.sheets.reservations);
+      const next = {};
+      rows.forEach(row => {
+        const id = row['codigo del regalo'];
+        const name = row['reservado por'];
+        if (id && name && !next[id]) next[id] = name;
+      });
+      remoteReservations = next;
+      Object.keys(pendingReservations).forEach(id => {
+        if (remoteReservations[id]) delete pendingReservations[id];
+      });
+      reservationsReady = true;
+      renderGifts();
+    } catch (error) {
+      console.warn('No fue posible actualizar las reservas compartidas.', error);
+      reservationsReady = true;
+      renderGifts();
+    }
+  }
+
+  function refreshSharedData() {
+    loadSharedWishes();
+    loadSharedReservations();
   }
 
   function initOpening() {
@@ -56,7 +136,7 @@
   }
 
   function renderGifts() {
-    const reserved = storage.get('luciano-reserved', {});
+    const reserved = { ...pendingReservations, ...remoteReservations };
     const contributions = CONTRIBUTIONS.map(item => ({ ...item, category:'contribution', image:FALLBACK.essential, link:'', estimated:true }));
     const items = [...GIFTS, ...contributions]
       .filter(gift => activeFilter === 'all' || gift.category === activeFilter)
@@ -71,9 +151,11 @@
           ${gift.estimated ? '<p class="estimated">Valor referencial</p>' : ''}
           ${gift.contributed
             ? `<p class="contributed-state">Este regalo será llevado con mucho cariño por<strong>${escapeHtml(gift.contributors)}</strong></p>`
-            : reserved[gift.id]
+            : gift.category === 'contribution'
+            ? `<button class="secondary" type="button" data-contribute="${gift.id}">Hacer este aporte</button>`
+            : reserved[String(gift.id)]
             ? `<p class="reserved-state">Reservado por<br><strong>${escapeHtml(reserved[gift.id])}</strong></p>`
-            : `<button type="button" data-gift="${gift.id}">Yo llevaré este regalo</button><button class="secondary" type="button" data-contribute="${gift.id}">Prefiero hacer un aporte</button>`}
+            : `<button type="button" data-gift="${gift.id}" ${reservationsReady ? '' : 'disabled'}>${reservationsReady ? 'Yo llevaré este regalo' : 'Comprobando disponibilidad…'}</button><button class="secondary" type="button" data-contribute="${gift.id}">Prefiero hacer un aporte</button>`}
         </div>
       </article>`
     ).join('');
@@ -110,7 +192,7 @@
   }
 
   function allWishes() {
-    return [...SAMPLE_WISHES, ...storage.get('luciano-wishes', [])];
+    return [...SAMPLE_WISHES, ...remoteWishes, ...pendingWishes];
   }
 
   function renderWishes() {
@@ -125,7 +207,7 @@
   }
 
   function showExitReminder() {
-    if (exitPromptShown || storage.get('luciano-wishes', []).length) return;
+    if (exitPromptShown || wishSentThisVisit) return;
     exitPromptShown = true;
     $('#exitReminder').hidden = false;
   }
@@ -153,37 +235,73 @@
     $('#giftDialog').addEventListener('click', event => {
       if (event.target.closest('.dialog-close') || event.target.closest('[data-close]')) $('#giftDialog').close();
     });
-    document.addEventListener('submit', event => {
+    document.addEventListener('submit', async event => {
       if (event.target.id !== 'reserveForm') return;
       event.preventDefault();
       if (!event.target.reportValidity()) return;
       const id = event.target.dataset.id;
       const name = new FormData(event.target).get('nombre').trim();
-      const reserved = storage.get('luciano-reserved', {});
-      reserved[id] = name; storage.set('luciano-reserved', reserved);
-      $('#giftDialog').close(); renderGifts();
+      const gift = GIFTS.find(item => String(item.id) === String(id));
+      const button = event.target.querySelector('[type="submit"]');
+      button.disabled = true;
+      button.textContent = 'Confirmando…';
+      try {
+        await postGoogleForm(SITE.forms.reservation, { giftId:id, giftName:gift?.name || '', reservedBy:name });
+        pendingReservations[id] = name;
+        $('#giftDialog').close();
+        renderGifts();
+        window.setTimeout(loadSharedReservations, 3500);
+      } catch {
+        button.disabled = false;
+        button.textContent = 'Confirmar que llevaré este regalo';
+        button.insertAdjacentHTML('afterend', '<p class="form-status">No pudimos confirmar ahora. Revisa tu conexión e inténtalo nuevamente.</p>');
+      }
     });
-    $('#rsvpForm').addEventListener('submit', event => {
+    $('#rsvpForm').addEventListener('submit', async event => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
       const response = Object.fromEntries(new FormData(event.currentTarget));
-      storage.set('luciano-rsvp', response);
+      const button = event.currentTarget.querySelector('[type="submit"]');
+      button.disabled = true;
+      button.textContent = 'Enviando confirmación…';
+      try {
+        await postGoogleForm(SITE.forms.rsvp, response);
+      } catch {
+        $('#rsvpStatus').textContent = 'No pudimos enviar la confirmación. Revisa tu conexión e inténtalo nuevamente.';
+        button.disabled = false;
+        button.textContent = 'Confirmar asistencia ✦';
+        return;
+      }
       const absent = response.asistire === 'No asistiré';
       $('#rsvpStatus').textContent = absent
         ? 'Lo entendemos y muchas gracias por avisarnos que no podrás ir. Antes de irte, por favor deja un mensaje lleno de amor para Luciano en El Cielo de Lucianito.'
         : '¡Gracias! Lucianito, David y Vanessa estarán muy felices de compartir este día contigo. No olvides dejar una estrella al final de la invitación.';
+      button.textContent = 'Confirmación enviada ✓';
       window.setTimeout(() => $('#cielo').scrollIntoView({ behavior:'smooth' }), 1800);
     });
-    $('#wishForm').addEventListener('submit', event => {
+    $('#wishForm').addEventListener('submit', async event => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
       const data = Object.fromEntries(new FormData(event.currentTarget));
-      const wishes = storage.get('luciano-wishes', []);
-      wishes.push({ name:data.nombre, message:data.deseo, date:new Intl.DateTimeFormat('es-CL', { day:'numeric', month:'long', year:'numeric' }).format(new Date()) });
-      storage.set('luciano-wishes', wishes);
+      const button = event.currentTarget.querySelector('[type="submit"]');
+      button.disabled = true;
+      button.textContent = 'Encendiendo tu estrella…';
+      try {
+        await postGoogleForm(SITE.forms.wish, data);
+      } catch {
+        $('#wishStatus').textContent = 'No pudimos enviar tu estrella. Revisa tu conexión e inténtalo nuevamente.';
+        button.disabled = false;
+        button.textContent = 'Dejar mi estrella ✦';
+        return;
+      }
+      pendingWishes.push({ name:data.nombre, message:data.deseo, date:new Intl.DateTimeFormat('es-CL', { day:'numeric', month:'long', year:'numeric' }).format(new Date()) });
+      wishSentThisVisit = true;
       event.currentTarget.reset();
       $('#wishStatus').textContent = `Gracias, ${data.nombre}. Tu estrella ya acompaña a Luciano.`;
+      button.disabled = false;
+      button.textContent = 'Dejar otra estrella ✦';
       renderWishes();
+      window.setTimeout(loadSharedWishes, 3500);
     });
     $('#wishSky').addEventListener('click', event => {
       const star = event.target.closest('.wish-star');
@@ -199,7 +317,7 @@
       }
     });
     window.setTimeout(() => document.addEventListener('mouseout', event => { if (event.clientY <= 0 && !event.relatedTarget) showExitReminder(); }), 12000);
-    window.addEventListener('beforeunload', event => { if (!storage.get('luciano-wishes', []).length) { event.preventDefault(); event.returnValue = ''; } });
+    window.addEventListener('beforeunload', event => { if (!wishSentThisVisit) { event.preventDefault(); event.returnValue = ''; } });
     $('#goToSky').addEventListener('click', () => { $('#exitReminder').hidden = true; });
     $('#continueExit').addEventListener('click', () => { $('#exitReminder').hidden = true; });
   }
@@ -213,10 +331,12 @@
   }
 
   function init() {
-    cleanTestDataOnce();
     initOpening(); updateCountdown(); window.setInterval(updateCountdown, 60000);
     renderFilters(); renderGifts(); renderExperiences(); renderBank(); renderWishes();
     initEvents(); initReveals();
+    refreshSharedData();
+    window.setInterval(refreshSharedData, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSharedData(); });
   }
 
   document.addEventListener('DOMContentLoaded', init);

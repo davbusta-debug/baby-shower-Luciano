@@ -1,5 +1,26 @@
 /* Datos editables de la invitación. Lista actualizada desde “Regalos baby shower (1).xlsx”. */
-const SITE = { birthDate:'2026-11-11T00:00:00-03:00', bank:{ bank:'Banco Estado', accountType:'Cuenta RUT', accountNumber:'15959892', holder:'Vanessa Sanchez', rut:'15.959.892-6', email:'' }, forms:{ rsvp:{url:'',entries:{}}, wish:{url:'',entries:{}}, reservation:{url:'',entries:{}} }, sheetCsv:'' };
+const SITE = {
+  birthDate:'2026-11-11T00:00:00-03:00',
+  bank:{ bank:'Banco Estado', accountType:'Cuenta RUT', accountNumber:'15959892', holder:'Vanessa Sanchez', rut:'15.959.892-6', email:'' },
+  forms:{
+    rsvp:{
+      url:'https://docs.google.com/forms/d/e/1FAIpQLSdcgSUNFSjWxUu52xnqDeWoJoBPPuXXwVod0JX-BPxuRrq6Xw/formResponse',
+      entries:{ nombre:'entry.1350998089', asistire:'entry.1599597483', adultos:'entry.87847607', ninos:'entry.358314711', ninas:'entry.1197691360', observaciones:'entry.1841609271' }
+    },
+    wish:{
+      url:'https://docs.google.com/forms/d/e/1FAIpQLSf2ro9gC_VOfpF3Yg1ZAje1e8wNbM3UvoqbAjHLTuV2PSh6gA/formResponse',
+      entries:{ nombre:'entry.224728195', deseo:'entry.612536593' }
+    },
+    reservation:{
+      url:'https://docs.google.com/forms/d/e/1FAIpQLSeOSvdjXjHBzX7g-i-en6xsRmFUI7FDiDZOu0GU8GiQM2vORg/formResponse',
+      entries:{ giftId:'entry.358853191', giftName:'entry.39874308', reservedBy:'entry.1576024371' }
+    }
+  },
+  sheets:{
+    wishes:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQRiqhwjTYvd2N2m--a-mopkHuAjqsGBDRFei0M_BqAa4CmIbjYAL7RCtq8KCO3cja63Yy4ZaN7aYut/pub?gid=25406909&single=true&output=csv',
+    reservations:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSzCE8rmyvw_hRYYjlfRm59MDrIF3eOztOX2vMGE_2tiUTHcG2_IT1M5mXCuQtfM1I7DKvWjK0mf9pe/pub?gid=1614507053&single=true&output=csv'
+  }
+};
 const FALLBACK = { essential:'assets/gifts/generic-essential.svg', care:'assets/gifts/generic-care.svg', clothing:'assets/gifts/generic-textile.svg', feeding:'assets/gifts/generic-feeding.svg' };
 const REAL_IMAGE_IDS = new Set([1,2,3,5,6,7,8,9,11,14,17,18,19,20,23,24,26,27,28,29,30,31,33,34,36,37]);
 const gift=(id,name,price,link,category,brand='')=>({id,name,price,link,category,brand,image:REAL_IMAGE_IDS.has(id)?`assets/gifts/products/gift-${String(id).padStart(2,'0')}.jpg`:FALLBACK[category],estimated:true});
