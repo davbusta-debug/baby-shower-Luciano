@@ -43,14 +43,26 @@
     return rows.map(values => Object.fromEntries(headers.map((header, index) => [header, (values[index] || '').trim()])));
   }
 
-  async function postGoogleForm(config, values) {
+  function postGoogleForm(config, values) {
     if (!config?.url) throw new Error('Formulario sin configurar');
     const body = new URLSearchParams();
     Object.entries(values).forEach(([key, value]) => {
       const entry = config.entries[key];
       if (entry && value !== undefined && value !== null) body.append(entry, String(value));
     });
-    await fetch(config.url, { method:'POST', mode:'no-cors', body });
+    const request = fetch(config.url, { method:'POST', mode:'no-cors', body });
+    /* Google guarda la respuesta correctamente, pero su conexión puede quedar
+       abierta varios segundos. Liberamos la interfaz sin cancelar el envío. */
+    return new Promise((resolve, reject) => {
+      const interfaceTimeout = window.setTimeout(resolve, 900);
+      request.then(() => {
+        window.clearTimeout(interfaceTimeout);
+        resolve();
+      }).catch(error => {
+        window.clearTimeout(interfaceTimeout);
+        reject(error);
+      });
+    });
   }
 
   async function fetchCsv(url) {
@@ -267,17 +279,18 @@
       try {
         await postGoogleForm(SITE.forms.rsvp, response);
       } catch {
+        $('#rsvpStatus').className = 'form-status error';
         $('#rsvpStatus').textContent = 'No pudimos enviar la confirmación. Revisa tu conexión e inténtalo nuevamente.';
         button.disabled = false;
         button.textContent = 'Confirmar asistencia ✦';
         return;
       }
       const absent = response.asistire === 'No asistiré';
+      $('#rsvpStatus').className = 'form-status success';
       $('#rsvpStatus').textContent = absent
-        ? 'Lo entendemos y muchas gracias por avisarnos que no podrás ir. Antes de irte, por favor deja un mensaje lleno de amor para Luciano en El Cielo de Lucianito.'
-        : '¡Gracias! Lucianito, David y Vanessa estarán muy felices de compartir este día contigo. No olvides dejar una estrella al final de la invitación.';
+        ? 'Lo entendemos y muchas gracias por avisarnos que no podrás ir. Por favor, sigue bajando para conocer las opciones de regalos, experiencias y aportes. Antes de irte, no olvides dejarle un buen deseo a Luciano en El Cielo de Lucianito, al final de la página.'
+        : '¡Gracias por confirmar! Sigue bajando para conocer las opciones de regalos, experiencias y aportes. Antes de irte, no olvides dejarle un buen deseo a Luciano en El Cielo de Lucianito, al final de la página.';
       button.textContent = 'Confirmación enviada ✓';
-      window.setTimeout(() => $('#cielo').scrollIntoView({ behavior:'smooth' }), 1800);
     });
     $('#wishForm').addEventListener('submit', async event => {
       event.preventDefault();
@@ -289,6 +302,7 @@
       try {
         await postGoogleForm(SITE.forms.wish, data);
       } catch {
+        $('#wishStatus').className = 'form-status error';
         $('#wishStatus').textContent = 'No pudimos enviar tu estrella. Revisa tu conexión e inténtalo nuevamente.';
         button.disabled = false;
         button.textContent = 'Dejar mi estrella ✦';
@@ -297,7 +311,8 @@
       pendingWishes.push({ name:data.nombre, message:data.deseo, date:new Intl.DateTimeFormat('es-CL', { day:'numeric', month:'long', year:'numeric' }).format(new Date()) });
       wishSentThisVisit = true;
       event.currentTarget.reset();
-      $('#wishStatus').textContent = `Gracias, ${data.nombre}. Tu estrella ya acompaña a Luciano.`;
+      $('#wishStatus').className = 'form-status success';
+      $('#wishStatus').textContent = `¡Gracias, ${data.nombre}! Tu estrella ya fue publicada y acompaña a Luciano.`;
       button.disabled = false;
       button.textContent = 'Dejar otra estrella ✦';
       renderWishes();

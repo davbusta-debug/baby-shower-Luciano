@@ -71,6 +71,9 @@ fieldset{border:0;padding:0;margin:0}
 .choice input:checked+span{background:var(--gold);border-color:var(--gold);color:var(--night)}
 .number-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
 .form-status{color:#fff1bc;font-weight:700;min-height:1.6em}
+.form-status.success,.form-status.error{margin-top:1rem;padding:1rem 1.1rem;border-radius:12px;line-height:1.55}
+.form-status.success{border:1px solid rgba(246,207,105,.72);background:rgba(246,207,105,.12);color:#fff7d6}
+.form-status.error{border:1px solid rgba(255,174,174,.72);background:rgba(138,32,42,.34);color:#fff0f0}
 
 .important-pause{overflow:hidden;background:linear-gradient(135deg,#051229cc,#123e72aa)}
 .shooting-star{position:absolute;width:14px;height:14px;background:var(--gold);clip-path:polygon(50% 0,61% 38%,100% 50%,61% 62%,50% 100%,39% 62%,0 50%,39% 38%);filter:drop-shadow(0 0 10px #ffd978);animation:shoot 8s ease-in-out infinite}
