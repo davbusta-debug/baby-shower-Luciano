@@ -292,15 +292,15 @@
         : '¡Gracias por confirmar! Sigue bajando para conocer las opciones de regalos, experiencias y aportes. Antes de irte, no olvides dejarle un buen deseo a Luciano en El Cielo de Lucianito, al final de la página.';
       button.textContent = 'Confirmación enviada ✓';
     });
-    $('#wishForm').addEventListener('submit', async event => {
+    $('#wishForm').addEventListener('submit', event => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
       const data = Object.fromEntries(new FormData(event.currentTarget));
       const button = event.currentTarget.querySelector('[type="submit"]');
       button.disabled = true;
-      button.textContent = 'Encendiendo tu estrella…';
+      let submission;
       try {
-        await postGoogleForm(SITE.forms.wish, data);
+        submission = postGoogleForm(SITE.forms.wish, data);
       } catch {
         $('#wishStatus').className = 'form-status error';
         $('#wishStatus').textContent = 'No pudimos enviar tu estrella. Revisa tu conexión e inténtalo nuevamente.';
@@ -312,10 +312,14 @@
       wishSentThisVisit = true;
       event.currentTarget.reset();
       $('#wishStatus').className = 'form-status success';
-      $('#wishStatus').textContent = `¡Gracias, ${data.nombre}! Tu estrella ya fue publicada y acompaña a Luciano.`;
+      $('#wishStatus').textContent = `¡Gracias por dejar tu buen deseo para Lucianito, ${data.nombre}! Tu estrella ya brilla en su cielo.`;
       button.disabled = false;
       button.textContent = 'Dejar otra estrella ✦';
       renderWishes();
+      submission.catch(() => {
+        $('#wishStatus').className = 'form-status error';
+        $('#wishStatus').textContent = 'La estrella quedó visible, pero no pudimos guardarla. Revisa tu conexión e inténtalo nuevamente.';
+      });
       window.setTimeout(loadSharedWishes, 3500);
     });
     $('#wishSky').addEventListener('click', event => {
