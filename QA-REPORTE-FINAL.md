@@ -47,3 +47,19 @@ Las respuestas de asistencia se enviaron correctamente al formulario privado. Co
 Después de revisar este informe, busca y elimina de las tres hojas todas las filas cuyos nombres sean `Prueba automatizada 3`, `Prueba automatizada 4`, `Prueba automatizada 5`, `Prueba automatizada 6` y `Prueba automatizada 7`.
 
 No elimines las filas reales de invitados ni las reservas reales.
+
+## Pruebas en la página publicada
+
+Se realizaron cinco recorridos adicionales directamente en GitHub Pages:
+
+| Prueba | Asistencia | Regalo | Experiencia comprobada | Resultado |
+| --- | --- | --- | --- | --- |
+| Prueba automatizada 8 | Sí | Crema de lanolina | Una estrella para Luciano | Publicada en formularios y hojas |
+| Prueba automatizada 9 | No | Absorbentes de lactancia | Guitarra con Violeta Parra | Publicada en formularios y hojas |
+| Prueba automatizada 10 | Sí, con niño | Compresas frío/calor | Fútbol con Alexis Sánchez | Publicada en formularios y hojas |
+| Prueba automatizada 11 | Sí, con niña | Bandanas | Una estrella para Luciano | Publicada; reveló concurrencia entre pestañas |
+| Prueba automatizada 12 | No | Lima de uñas eléctrica | Guitarra con Violeta Parra | Publicada en formularios y hojas |
+
+Las cinco reservas y los cinco deseos fueron confirmados en las hojas públicas. La prueba 11 permitió detectar que varias pestañas abiertas podían sobrescribir temporalmente datos pendientes del mismo navegador. La versión `final7` fusiona los datos entre pestañas y evita esa pérdida temporal.
+
+En la limpieza final, elimina también las filas `Prueba automatizada 8` a `Prueba automatizada 12` de las tres hojas.

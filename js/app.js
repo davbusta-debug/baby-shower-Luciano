@@ -24,6 +24,14 @@
     catch { /* El deseo seguirá visible durante la sesión actual. */ }
   }
 
+  function mergePendingWishes(...collections) {
+    const merged = new Map();
+    collections.flat().forEach(wish => {
+      if (wish?.name && wish?.message) merged.set(wishKey(wish), wish);
+    });
+    return [...merged.values()];
+  }
+
   function readPendingReservations() {
     try { return JSON.parse(localStorage.getItem('luciano-pending-reservations')) || {}; }
     catch { return {}; }
@@ -110,7 +118,7 @@
         date:row['marca temporal']
       })).filter(wish => wish.name && wish.message);
       const remoteKeys = new Set(remoteWishes.map(wishKey));
-      pendingWishes = pendingWishes.filter(wish => !remoteKeys.has(wishKey(wish)));
+      pendingWishes = mergePendingWishes(pendingWishes, readPendingWishes()).filter(wish => !remoteKeys.has(wishKey(wish)));
       savePendingWishes();
       renderWishes();
     } catch (error) {
@@ -129,6 +137,7 @@
         if (id && name && !next[id]) next[id] = name;
       });
       remoteReservations = next;
+      pendingReservations = { ...pendingReservations, ...readPendingReservations() };
       Object.keys(pendingReservations).forEach(id => {
         if (remoteReservations[id]) delete pendingReservations[id];
       });
@@ -296,7 +305,7 @@
       button.textContent = 'Confirmando…';
       try {
         await postGoogleForm(SITE.forms.reservation, { giftId:id, giftName:gift?.name || '', reservedBy:name });
-        pendingReservations[id] = name;
+        pendingReservations = { ...readPendingReservations(), ...pendingReservations, [id]:name };
         savePendingReservations();
         $('#giftDialog').close();
         renderGifts();
@@ -346,7 +355,7 @@
         button.textContent = 'Dejar mi estrella ✦';
         return;
       }
-      pendingWishes.push({ name:data.nombre, message:data.deseo, date:new Intl.DateTimeFormat('es-CL', { day:'numeric', month:'long', year:'numeric' }).format(new Date()) });
+      pendingWishes = mergePendingWishes(readPendingWishes(), pendingWishes, [{ name:data.nombre, message:data.deseo, date:new Intl.DateTimeFormat('es-CL', { day:'numeric', month:'long', year:'numeric' }).format(new Date()) }]);
       savePendingWishes();
       wishSentThisVisit = true;
       event.currentTarget.reset();

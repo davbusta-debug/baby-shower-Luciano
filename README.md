@@ -118,6 +118,8 @@ Google puede tardar algunos minutos en actualizar las hojas publicadas. Mientras
 
 La auditoría detallada de la versión entregada está en `QA-REPORTE-FINAL.md`.
 
+El enlace corto creado para compartir la invitación es `https://tinyurl.com/232eehyo`. Redirige a la dirección oficial de GitHub Pages, por lo que seguirá mostrando las futuras actualizaciones publicadas en el mismo repositorio.
+
 ## Accesibilidad y rendimiento
 
 La página incluye navegación por teclado, enlace para saltar al contenido, alternativas de texto en imágenes, contraste cuidado y respeto por `prefers-reduced-motion`. Las imágenes de regalos usan carga diferida y los dibujos se mantienen ligeros para favorecer una carga rápida.
