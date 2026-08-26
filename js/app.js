@@ -10,9 +10,19 @@
   let remoteWishes = [];
   let remoteReservations = {};
   let pendingWishes = [];
-  let pendingReservations = {};
+  let pendingReservations = readPendingReservations();
   let reservationsReady = false;
   let wishSentThisVisit = false;
+
+  function readPendingReservations() {
+    try { return JSON.parse(localStorage.getItem('luciano-pending-reservations')) || {}; }
+    catch { return {}; }
+  }
+
+  function savePendingReservations() {
+    try { localStorage.setItem('luciano-pending-reservations', JSON.stringify(pendingReservations)); }
+    catch { /* La reserva seguirá visible durante la sesión actual. */ }
+  }
 
   function normalizeHeader(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
@@ -105,6 +115,7 @@
       Object.keys(pendingReservations).forEach(id => {
         if (remoteReservations[id]) delete pendingReservations[id];
       });
+      savePendingReservations();
       reservationsReady = true;
       renderGifts();
     } catch (error) {
@@ -260,6 +271,7 @@
       try {
         await postGoogleForm(SITE.forms.reservation, { giftId:id, giftName:gift?.name || '', reservedBy:name });
         pendingReservations[id] = name;
+        savePendingReservations();
         $('#giftDialog').close();
         renderGifts();
         window.setTimeout(loadSharedReservations, 3500);
@@ -354,7 +366,7 @@
     renderFilters(); renderGifts(); renderExperiences(); renderBank(); renderWishes();
     initEvents(); initReveals();
     refreshSharedData();
-    window.setInterval(refreshSharedData, 60000);
+    window.setInterval(refreshSharedData, 20000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSharedData(); });
   }
 
