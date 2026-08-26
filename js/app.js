@@ -9,10 +9,20 @@
   let exitPromptShown = false;
   let remoteWishes = [];
   let remoteReservations = {};
-  let pendingWishes = [];
+  let pendingWishes = readPendingWishes();
   let pendingReservations = readPendingReservations();
   let reservationsReady = false;
   let wishSentThisVisit = false;
+
+  function readPendingWishes() {
+    try { return JSON.parse(localStorage.getItem('luciano-pending-wishes')) || []; }
+    catch { return []; }
+  }
+
+  function savePendingWishes() {
+    try { localStorage.setItem('luciano-pending-wishes', JSON.stringify(pendingWishes)); }
+    catch { /* El deseo seguirá visible durante la sesión actual. */ }
+  }
 
   function readPendingReservations() {
     try { return JSON.parse(localStorage.getItem('luciano-pending-reservations')) || {}; }
@@ -76,9 +86,15 @@
   }
 
   async function fetchCsv(url) {
-    const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache:'no-store' });
-    if (!response.ok) throw new Error(`No se pudo leer la hoja (${response.status})`);
-    return parseCsv(await response.text());
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache:'no-store', signal:controller.signal });
+      if (!response.ok) throw new Error(`No se pudo leer la hoja (${response.status})`);
+      return parseCsv(await response.text());
+    } finally {
+      window.clearTimeout(timeout);
+    }
   }
 
   function wishKey(wish) {
@@ -95,6 +111,7 @@
       })).filter(wish => wish.name && wish.message);
       const remoteKeys = new Set(remoteWishes.map(wishKey));
       pendingWishes = pendingWishes.filter(wish => !remoteKeys.has(wishKey(wish)));
+      savePendingWishes();
       renderWishes();
     } catch (error) {
       console.warn('No fue posible actualizar el cielo compartido.', error);
@@ -158,6 +175,15 @@
     return gift.image || FALLBACK[gift.category] || FALLBACK.essential;
   }
 
+  function initImageFallbacks() {
+    document.addEventListener('error', event => {
+      const image = event.target;
+      if (!(image instanceof HTMLImageElement) || !image.dataset.fallback || image.dataset.fallbackApplied) return;
+      image.dataset.fallbackApplied = 'true';
+      image.src = image.dataset.fallback;
+    }, true);
+  }
+
   function renderGifts() {
     const reserved = { ...pendingReservations, ...remoteReservations };
     const contributions = CONTRIBUTIONS.map(item => ({ ...item, category:'contribution', image:FALLBACK.essential, link:'', estimated:true }));
@@ -166,7 +192,7 @@
       .sort((a, b) => Number(Boolean(b.contributed)) - Number(Boolean(a.contributed)) || (b.price || 0) - (a.price || 0));
     $('#giftGrid').innerHTML = items.map(gift => `
       <article class="gift-card reveal visible${gift.contributed ? ' contributed' : ''}">
-        <img src="${escapeHtml(giftImage(gift))}" alt="Imagen de referencia de ${escapeHtml(gift.name)}" loading="lazy" width="900" height="900">
+        <img src="${escapeHtml(giftImage(gift))}" data-fallback="${escapeHtml(FALLBACK[gift.category] || FALLBACK.essential)}" alt="Imagen de referencia de ${escapeHtml(gift.name)}" loading="lazy" decoding="async" width="900" height="900">
         <div class="gift-body">
           <small>${categories[gift.category]}</small>
           <h3>${escapeHtml(gift.name)}</h3>
@@ -189,8 +215,8 @@
     if (!gift) return;
     const dialog = $('#giftDialog');
     $('#giftDialogContent').innerHTML = contribution
-      ? `<p class="eyebrow">Un aporte para Luciano</p><h3>${escapeHtml(gift.name)}</h3><p>Puedes aportar el valor completo o una parte desde la sección bancaria.</p><a class="button" href="#aporte" data-close>Ver aporte bancario</a>`
-      : `<p class="eyebrow">Un regalo para Luciano</p><h3>${escapeHtml(gift.name)}</h3><p><strong>${money.format(gift.price)}</strong></p>${gift.link ? `<p><a class="text-link" href="${escapeHtml(gift.link)}" target="_blank" rel="noopener">Ver producto ↗</a></p>` : ''}<form id="reserveForm" data-id="${gift.id}"><label>Tu nombre<input name="nombre" required autocomplete="name"></label><button class="button" type="submit">Confirmar que llevaré este regalo</button></form>`;
+      ? `<p class="eyebrow">Un aporte para Luciano</p><h3 id="giftDialogTitle">${escapeHtml(gift.name)}</h3><p>Puedes aportar el valor completo o una parte desde la sección bancaria.</p><a class="button" href="#aporte" data-close>Ver aporte bancario</a>`
+      : `<p class="eyebrow">Un regalo para Luciano</p><h3 id="giftDialogTitle">${escapeHtml(gift.name)}</h3><p><strong>${money.format(gift.price)}</strong></p>${gift.link ? `<p><a class="text-link" href="${escapeHtml(gift.link)}" target="_blank" rel="noopener">Ver producto ↗</a></p>` : ''}<form id="reserveForm" data-id="${gift.id}"><label>Tu nombre<input name="nombre" required autocomplete="name"></label><button class="button" type="submit">Confirmar que llevaré este regalo</button></form>`;
     dialog.showModal();
   }
 
@@ -321,6 +347,7 @@
         return;
       }
       pendingWishes.push({ name:data.nombre, message:data.deseo, date:new Intl.DateTimeFormat('es-CL', { day:'numeric', month:'long', year:'numeric' }).format(new Date()) });
+      savePendingWishes();
       wishSentThisVisit = true;
       event.currentTarget.reset();
       $('#wishStatus').className = 'form-status success';
@@ -362,6 +389,7 @@
   }
 
   function init() {
+    initImageFallbacks();
     initOpening(); updateCountdown(); window.setInterval(updateCountdown, 60000);
     renderFilters(); renderGifts(); renderExperiences(); renderBank(); renderWishes();
     initEvents(); initReveals();

@@ -114,7 +114,9 @@ Al eliminar una fila de esa hoja, su estrella dejará de aparecer al actualizar 
 5. Reserva un regalo económico de prueba. Abre la invitación en otro dispositivo o en una ventana privada: la tarjeta debe mostrar el mismo nombre.
 6. Borra las dos filas de prueba en las hojas de estrellas y reservas. Recarga la invitación y ambas deben desaparecer.
 
-Google puede tardar algunos segundos en actualizar las hojas publicadas. La página vuelve a consultar los datos automáticamente cada minuto y también al regresar a la pestaña.
+Google puede tardar algunos minutos en actualizar las hojas publicadas. Mientras espera esa confirmación, tanto la reserva como la estrella quedan guardadas en el navegador de la persona que las creó para que no desaparezcan al recargar. La página vuelve a consultar los datos compartidos automáticamente cada 20 segundos y también al regresar a la pestaña.
+
+La auditoría detallada de la versión entregada está en `QA-REPORTE-FINAL.md`.
 
 ## Accesibilidad y rendimiento
 
